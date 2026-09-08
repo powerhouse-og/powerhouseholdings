@@ -22,10 +22,20 @@ Open `index.html` directly, or serve the folder:
 python -m http.server 8931
 ```
 
-## Deploy
+## Deploy (Render + Cloudflare)
 
-Any static host. For GitHub Pages: Settings → Pages → deploy from `main`, root.
-`CNAME` is set to `powerhouseholdings.us`; point the domain's DNS at Pages and it binds automatically.
+Same routine as Cardonomics, minus the database:
+
+1. **Render → New → Blueprint** → connect this repo → Apply. It reads `render.yaml`
+   and creates a free static site with auto-deploy from `main`.
+2. When the first deploy succeeds, **Settings → Custom Domains** → add
+   `powerhouseholdings.us` and `www.powerhouseholdings.us`. Copy the `.onrender.com` target.
+3. **Cloudflare → DNS** → point `@` and `www` at that target (CNAME, grey cloud first).
+4. Wait for Render to show both verified with certificates, set Cloudflare SSL to
+   **Full (strict)**, then flip both records to orange cloud.
+5. Cloudflare → Speed → **Rocket Loader off** (it breaks deferred scripts).
+
+Every later `git push` to `main` goes live on its own.
 
 ## Design system
 

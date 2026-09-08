@@ -1,0 +1,23 @@
+# Render blueprint. Connect the repo, point Render at this file, and it
+# creates the site. Static hosting — no server, no build, no cost.
+services:
+  - type: web
+    name: powerhouseholdings
+    runtime: static
+    plan: free                    # static sites are free on Render
+    buildCommand: ""              # plain HTML/CSS/JS — nothing to build
+    staticPublishPath: .
+    autoDeploy: true              # every push to main goes live
+    # Custom domains are added in the Render dashboard AFTER the first deploy
+    # succeeds. Listing them here before DNS points at Render makes the first
+    # deploy fail for a confusing reason.
+    # domains:
+    #   - powerhouseholdings.us
+    #   - www.powerhouseholdings.us
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=86400
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
