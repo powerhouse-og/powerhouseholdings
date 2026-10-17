@@ -1,101 +1,17 @@
 /* =============================================================================
-   Powerhouse Holdings — hero energy field
-   A WebGL2 contour field that bends toward the cursor: the charged seam,
-   alive. Ported from Powerhouse Digital's field and calmed for the parent
-   brand — violet instead of volt, longer time constants, quieter pulses.
+   Powerhouse Holdings — hero: the charged grid
+   The hero's column grid made live. Vertical hairlines bow around the cursor
+   like strings around a presence, and the brand's charged seam slides across
+   the grid to meet it, a slow pulse riding down the line.
 
-   Degrades completely: no WebGL2, reduced motion, or any failure leaves the
-   CSS field (grid + seam) exactly as it was.
+   Deliberately rectilinear — Powerhouse Digital's hero is an organic contour
+   field; the parent's is architecture. Canvas2D, no dependencies.
+
+   Degrades completely: reduced motion or any failure leaves the static CSS
+   field (grid + seam) exactly as it was.
    ========================================================================== */
 (function () {
   'use strict';
-
-  const VERT = `#version 300 es
-in vec2 aPos;
-void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
-
-  const FRAG = `#version 300 es
-precision highp float;
-uniform vec2 uRes;
-uniform float uTime;
-uniform vec2 uMouse;
-uniform float uIntro;
-uniform float uScroll;
-out vec4 outColor;
-
-vec2 hash2(vec2 p) {
-  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-  return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
-}
-float gnoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(dot(hash2(i), f), dot(hash2(i + vec2(1, 0)), f - vec2(1, 0)), u.x),
-             mix(dot(hash2(i + vec2(0, 1)), f - vec2(0, 1)), dot(hash2(i + vec2(1, 1)), f - vec2(1, 1)), u.x), u.y);
-}
-float fbm(vec2 p) {
-  float v = 0.0, a = 0.5;
-  mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
-  for (int i = 0; i < 4; i++) { v += a * gnoise(p); p = m * p; a *= 0.5; }
-  return v;
-}
-float iso(float k, float w) {
-  float fw = fwidth(k);
-  float g = abs(fract(k) - 0.5) * 2.0;
-  return 1.0 - smoothstep(0.0, fw * w, 1.0 - g);
-}
-
-void main() {
-  vec2 uv = gl_FragCoord.xy / uRes;
-  float asp = uRes.x / uRes.y;
-  vec2 p0 = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
-  vec2 m = (uMouse - 0.5 * uRes) / uRes.y;
-  float t = uTime * 0.028;                       /* slower than Digital — unhurried */
-
-  vec2 p = p0;
-  vec2 d = p - m;
-  float md = length(d);
-  p -= d * exp(-md * md * 7.0) * 0.30;           /* gentler cursor lens */
-  p.y -= uScroll * 0.6;
-
-  vec2 q = vec2(fbm(p * 1.05 + vec2(0.0, t)), fbm(p * 1.05 + vec2(5.2, -t)));
-  float n = fbm(p * 0.85 + q * 1.7 + vec2(t * 0.6, t * 0.2));
-
-  float k = n * 16.0;
-  float line = iso(k, 2.2);
-  float major = iso(k / 6.0, 3.0);
-  float pulse = pow(0.5 + 0.5 * sin(k * 0.4 - uTime * 0.9), 26.0);
-
-  vec3 ink    = vec3(0.039, 0.039, 0.047);       /* Obsidian */
-  vec3 bone   = vec3(0.929, 0.925, 0.914);       /* Bone */
-  vec3 violet = vec3(0.435, 0.357, 0.910);       /* Ultraviolet */
-  vec3 lift   = vec3(0.576, 0.518, 0.949);       /* Ultraviolet lift */
-
-  float glow = exp(-md * md * 5.5);
-  vec3 col = ink;
-  col += bone * line * 0.045;
-  col += bone * major * 0.07;
-  col += violet * line * (glow * 0.6 + pulse * 0.16);
-  col += lift * major * pulse * 0.22;
-  col += violet * glow * 0.022;
-
-  float vig = smoothstep(1.35, 0.25, length((uv - vec2(0.55, 0.62)) * vec2(asp * 0.7, 1.0)));
-  col = mix(ink, col, vig);
-  col = mix(col, ink, smoothstep(0.55, 0.0, uv.y) * 0.65);  /* settle toward the hero's base */
-
-  /* power-on: a single soft front, once */
-  float r = length(p0 - vec2(-0.2, 0.15));
-  float front = uIntro * 2.0;
-  float reveal = smoothstep(front, front - 0.5, r);
-  float ring = exp(-pow((r - front + 0.08) * 10.0, 2.0)) * (1.0 - smoothstep(0.7, 1.0, uIntro));
-  col = mix(ink, col, reveal);
-  col += violet * ring * (line * 0.5 + 0.03);
-
-  float gr = fract(sin(dot(gl_FragCoord.xy + fract(uTime) * 100.0, vec2(12.9898, 78.233))) * 43758.5453);
-  col += (gr - 0.5) * 0.016;
-
-  outColor = vec4(col, 1.0);
-}`;
 
   function init() {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -106,44 +22,37 @@ void main() {
     canvas.className = 'hero-canvas';
     canvas.setAttribute('aria-hidden', 'true');
     hero.prepend(canvas);
-
-    const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false, powerPreference: 'high-performance' });
-    if (!gl) { canvas.remove(); return; }
-
-    const sh = (type, src) => {
-      const s = gl.createShader(type);
-      gl.shaderSource(s, src); gl.compileShader(s);
-      return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
-    };
-    const vs = sh(gl.VERTEX_SHADER, VERT), fs = sh(gl.FRAGMENT_SHADER, FRAG);
-    if (!vs || !fs) { canvas.remove(); return; }
-    const prog = gl.createProgram();
-    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { canvas.remove(); return; }
-    gl.useProgram(prog);
-
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, 'aPos');
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-
-    const U = {};
-    ['uRes', 'uTime', 'uMouse', 'uIntro', 'uScroll'].forEach(n => (U[n] = gl.getUniformLocation(prog, n)));
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) { canvas.remove(); return; }
 
     hero.classList.add('has-field');
 
-    let dpr = 1, w = 0, h = 0, quality = 1;
+    /* ---- palette ---- */
+    const INK = '#0A0A0C';
+    const BONE = (a) => `rgba(237,236,233,${a})`;
+    const VIOLET = (a) => `rgba(111,91,232,${a})`;
+    const LIFT = (a) => `rgba(147,132,242,${a})`;
+
+    /* ---- state ---- */
+    let dpr = 1, W = 0, H = 0;
+    let SPACING = 30, SEGS = 36;
     const mouse = { x: 0, y: 0, tx: 0, ty: 0, init: false, lastReal: 0 };
+    let seamX = 0;                      /* the charged seam's current x */
+    let visible = true, raf = 0, last = 0, frames = 0, slow = 0, quality = 1;
+    const start = performance.now();
 
     function resize() {
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5) * quality;
-      w = Math.max(1, Math.round(canvas.clientWidth * dpr));
-      h = Math.max(1, Math.round(canvas.clientHeight * dpr));
-      canvas.width = w; canvas.height = h;
-      gl.viewport(0, 0, w, h);
-      if (!mouse.init) { mouse.x = mouse.tx = w * 0.64; mouse.y = mouse.ty = h * 0.58; mouse.init = true; }
+      dpr = Math.min(window.devicePixelRatio || 1, 2) * quality;
+      W = Math.max(1, Math.round(canvas.clientWidth * dpr));
+      H = Math.max(1, Math.round(canvas.clientHeight * dpr));
+      canvas.width = W; canvas.height = H;
+      SPACING = Math.round(34 * dpr);                 /* ~34 CSS px between strings */
+      SEGS = Math.max(24, Math.round(36 * quality));
+      if (!mouse.init) {
+        mouse.x = mouse.tx = W * 0.62; mouse.y = mouse.ty = H * 0.46;
+        seamX = W / 3;                  /* where the static seam lives */
+        mouse.init = true;
+      }
     }
     resize();
     window.addEventListener('resize', resize, { passive: true });
@@ -151,45 +60,125 @@ void main() {
     window.addEventListener('pointermove', (e) => {
       const r = canvas.getBoundingClientRect();
       mouse.tx = (e.clientX - r.left) * dpr;
-      mouse.ty = (r.height - (e.clientY - r.top)) * dpr;
+      mouse.ty = (e.clientY - r.top) * dpr;
       mouse.lastReal = performance.now();
     }, { passive: true });
 
-    let visible = true;
     new IntersectionObserver(([en]) => { visible = en.isIntersecting; if (visible) kick(); }).observe(canvas);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(); });
 
-    const start = performance.now();
-    let raf = 0, last = 0, frames = 0, slow = 0, intro = 0;
+    /* displacement of a point (x, y) given the presence at (mx, my):
+       lines bow away horizontally, strongest beside the cursor, fading with
+       vertical distance — strings parting around a hand. */
+    function bend(x, y, mx, my, R) {
+      const dx = x - mx, dy = y - my;
+      const fall = Math.exp(-(dx * dx) / (2 * R * R) - (dy * dy) / (2 * (R * 1.6) * (R * 1.6)));
+      const dir = dx === 0 ? 0 : dx / Math.abs(dx);
+      return dir * fall * R * 0.34;
+    }
+
+    function drawLine(x0, t, mx, my, R, intro, stroke, width, pulseT) {
+      /* intro: lines grow downward, staggered by x */
+      const grow = Math.min(1, Math.max(0, intro * 2.2 - (x0 / W) * 1.0));
+      if (grow <= 0) return;
+      const yMax = H * grow;
+
+      ctx.beginPath();
+      for (let i = 0; i <= SEGS; i++) {
+        const y = (H / SEGS) * i;
+        if (y > yMax) break;
+        const sway = Math.sin(t * 0.00035 + x0 * 0.011 + y * 0.0016) * dpr * 1.1;
+        const x = x0 + bend(x0, y, mx, my, R) + sway;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = width;
+      ctx.stroke();
+
+      /* a pulse riding down the charged line */
+      if (pulseT !== undefined) {
+        const py = ((pulseT % 4200) / 4200) * (H + 220) - 110;
+        if (py > -110 && py < yMax + 110) {
+          const sway = Math.sin(t * 0.00035 + x0 * 0.011 + py * 0.0016) * dpr * 1.1;
+          const px = x0 + bend(x0, py, mx, my, R) + sway;
+          const g = ctx.createLinearGradient(0, py - 90 * dpr, 0, py + 90 * dpr);
+          g.addColorStop(0, LIFT(0));
+          g.addColorStop(0.5, LIFT(0.9));
+          g.addColorStop(1, LIFT(0));
+          ctx.beginPath();
+          ctx.moveTo(px, Math.max(0, py - 90 * dpr));
+          ctx.lineTo(px, Math.min(yMax, py + 90 * dpr));
+          ctx.strokeStyle = g;
+          ctx.lineWidth = 1.6 * dpr;
+          ctx.stroke();
+        }
+      }
+    }
 
     function frame(now) {
       raf = 0;
       if (!visible || document.hidden) return;
       const dt = now - (last || now); last = now;
 
-      /* adaptive quality: a struggling machine gets a lighter field, not jank */
+      /* adaptive: a struggling machine gets fewer segments, not jank */
       if (frames++ > 30 && quality > 0.6) {
         slow = dt > 24 ? slow + 1 : Math.max(0, slow - 1);
         if (slow > 40) { quality = 0.6; slow = 0; resize(); }
       }
 
-      /* no pointer (touch, or idle): the field breathes on its own */
+      /* idle or touch: the presence wanders on its own */
       if (now - mouse.lastReal > 4000) {
-        const a = now * 0.00012;
-        mouse.tx = w * (0.5 + 0.26 * Math.sin(a) + 0.08 * Math.sin(a * 2.7));
-        mouse.ty = h * (0.55 + 0.2 * Math.cos(a * 0.8));
+        const a = now * 0.00011;
+        mouse.tx = W * (0.5 + 0.3 * Math.sin(a) + 0.07 * Math.sin(a * 2.3));
+        mouse.ty = H * (0.48 + 0.22 * Math.cos(a * 0.7));
+      }
+      mouse.x += (mouse.tx - mouse.x) * 0.06;
+      mouse.y += (mouse.ty - mouse.y) * 0.06;
+      seamX += (mouse.x - seamX) * 0.028;          /* the seam follows, unhurried */
+
+      const t = now;
+      const intro = Math.min(1, (now - start) / 2200);
+      const R = Math.min(W, H) * 0.22;
+
+      ctx.fillStyle = INK;
+      ctx.fillRect(0, 0, W, H);
+
+      /* a quiet halo around the presence */
+      const halo = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, R * 2.4);
+      halo.addColorStop(0, VIOLET(0.075 * intro));
+      halo.addColorStop(1, VIOLET(0));
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, W, H);
+
+      /* the grid */
+      const n = Math.floor(W / SPACING);
+      for (let i = 0; i <= n; i++) {
+        const x0 = i * SPACING + (W - n * SPACING) / 2;
+        const near = Math.exp(-Math.pow(x0 - mouse.x, 2) / (2 * R * R));
+        const a = 0.07 + near * 0.2;
+        drawLine(x0, t, mouse.x, mouse.y, R, intro, i % 5 === 0 ? BONE(Math.min(0.34, a * 1.6)) : BONE(a), dpr * (i % 5 === 0 ? 1 : 0.8));
       }
 
-      intro = Math.min(1, (now - start) / 1900);
-      mouse.x += (mouse.tx - mouse.x) * 0.055;
-      mouse.y += (mouse.ty - mouse.y) * 0.055;
+      /* the charged seam — one line of light, sliding to meet the cursor */
+      const sg = ctx.createLinearGradient(0, 0, 0, H);
+      sg.addColorStop(0, VIOLET(0));
+      sg.addColorStop(0.25, VIOLET(0.75 * intro));
+      sg.addColorStop(0.5, LIFT(0.95 * intro));
+      sg.addColorStop(0.75, VIOLET(0.75 * intro));
+      sg.addColorStop(1, VIOLET(0));
+      ctx.save();
+      ctx.shadowColor = VIOLET(0.6);
+      ctx.shadowBlur = 14 * dpr;
+      drawLine(seamX, t, mouse.x, mouse.y, R, intro, sg, 1.4 * dpr, t);
+      ctx.restore();
 
-      gl.uniform2f(U.uRes, w, h);
-      gl.uniform1f(U.uTime, (now - start) / 1000);
-      gl.uniform2f(U.uMouse, mouse.x, mouse.y);
-      gl.uniform1f(U.uIntro, intro);
-      gl.uniform1f(U.uScroll, Math.min(1.4, window.scrollY / Math.max(1, window.innerHeight)));
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      /* settle toward the hero's base so the copy owns the lower third */
+      const fade = ctx.createLinearGradient(0, H * 0.5, 0, H);
+      fade.addColorStop(0, 'rgba(10,10,12,0)');
+      fade.addColorStop(1, 'rgba(10,10,12,0.78)');
+      ctx.fillStyle = fade;
+      ctx.fillRect(0, 0, W, H);
+
       raf = requestAnimationFrame(frame);
     }
     function kick() { if (!raf) { last = 0; raf = requestAnimationFrame(frame); } }
