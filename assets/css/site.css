@@ -140,7 +140,7 @@ ul,ol{ margin:0; padding:0; list-style:none; }
 .link:hover .arw{ transform:translateX(4px); }
 
 .btn{
-  --btn-fg:var(--obsidian); --btn-bg:var(--fg);
+  --btn-fg:var(--bg); --btn-bg:var(--fg); /* theme-aware: ink-on-bone on dark sections, bone-on-ink on inverted */
   position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.7em;
   padding:1.02em 1.85em; border-radius:var(--r); overflow:hidden; isolation:isolate;
   font:500 13px/1 var(--ui); letter-spacing:.02em;
